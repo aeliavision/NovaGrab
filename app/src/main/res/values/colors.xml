@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="purple_200">#FFBB86FC</color>
+    <color name="purple_500">#FF6200EE</color>
+    <color name="purple_700">#FF3700B3</color>
+    <color name="teal_200">#FF03DAC5</color>
+    <color name="teal_700">#FF018786</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+
+    <color name="obsidian_background">#FF0A0E14</color>
+    <color name="obsidian_surface_low">#FF0F141A</color>
+    <color name="obsidian_surface_container">#FF151A21</color>
+    <color name="obsidian_surface_high">#FF1B2028</color>
+    <color name="obsidian_surface_highest">#FF20262F</color>
+    <color name="obsidian_surface_bright">#FF262C36</color>
+
+    <color name="obsidian_primary">#FF00F4FE</color>
+    <color name="obsidian_primary_light">#FFA1FAFF</color>
+
+    <color name="obsidian_on_surface">#FFF1F3FC</color>
+</resources>
