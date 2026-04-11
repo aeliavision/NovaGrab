@@ -111,6 +111,7 @@ class HttpRangeDownloader @Inject constructor(
                                     tempDir = tempDir,
                                     bufferSizeBytes = bufferSizeBytes,
                                     onProgress = { bytesRead ->
+                                        if (bytesRead == 0L) return@downloadChunk
                                         val current = downloadedTotal.addAndGet(bytesRead)
                                         chunkDownloaded.addAndGet(chunk.index, bytesRead)
                                         val speed = speedometer.update(current)
@@ -267,6 +268,11 @@ class HttpRangeDownloader @Inject constructor(
         bufferSizeBytes: Int,
         onProgress: suspend (Long) -> Unit,
     ) {
+        if (chunk.downloadedBytes >= chunk.size) {
+            onProgress(0L)
+            return
+        }
+
         val resumeStart = chunk.startByte + chunk.downloadedBytes
         val request = Request.Builder()
             .url(url)
@@ -311,7 +317,7 @@ class HttpRangeDownloader @Inject constructor(
     private fun splitIntoChunks(totalBytes: Long, chunkCount: Int): List<ChunkRange> {
         if (totalBytes <= 0) return emptyList()
 
-        val chunkSize = totalBytes / chunkCount
+        val chunkSize = (totalBytes / chunkCount).coerceAtLeast(1L)
         return (0 until chunkCount).map { index ->
             val start = index * chunkSize
             val end = if (index == chunkCount - 1) totalBytes - 1 else (start + chunkSize - 1)

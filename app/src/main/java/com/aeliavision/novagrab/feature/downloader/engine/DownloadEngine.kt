@@ -93,11 +93,13 @@ class DownloadEngine @Inject constructor(
             downloadStateManager.markCompleted(taskId, uri.toString())
             storageManager.deleteTempDirForTask(taskId)
         } else {
+            val error = result.exceptionOrNull()?.message ?: "Unknown error"
             downloadStateManager.updateStatus(
                 taskId,
-                DownloadStatus.Failed(result.exceptionOrNull()?.message ?: "Unknown error"),
+                DownloadStatus.Failed(error),
             )
             // DO NOT delete temp dir on failure to allow resumption on next attempt
+            throw Exception(error)
         }
     }
 }
