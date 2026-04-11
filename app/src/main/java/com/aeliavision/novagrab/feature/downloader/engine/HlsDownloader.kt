@@ -76,6 +76,22 @@ class HlsDownloader @Inject constructor(
                 currentCoroutineContext().ensureActive()
                 val segFile = File(segmentDir, "seg_${index}.ts")
 
+                if (segFile.exists() && segFile.length() > 0) {
+                    downloadedBytesTotal += segFile.length()
+                    val speed = speedometer.update(downloadedBytesTotal)
+                    val segmentProgress = index.toFloat() / totalSegments.toFloat()
+                    onProgress(
+                        DownloadProgress(
+                            taskId = taskWithHeaders.id,
+                            downloadedBytes = downloadedBytesTotal,
+                            totalBytes = -1L,
+                            percentage = (segmentProgress * 100f).toInt().coerceIn(0, 99),
+                            speedBytesPerSec = speed,
+                        )
+                    )
+                    return@forEachIndexed
+                }
+
                 retryPolicy.withRetry {
                     val priorTotal = downloadedBytesTotal
                     try {
@@ -100,7 +116,7 @@ class HlsDownloader @Inject constructor(
                                 ivHex = encryptionInfo!!.iv,
                                 segmentSequence = seg.sequence.toLong(),
                             )
-                            decryptAes128InPlace(
+                            decryptAes128(
                                 file = segFile,
                                 keyBytes = encryptionKeyBytes!!,
                                 ivBytes = ivBytes,
@@ -111,6 +127,13 @@ class HlsDownloader @Inject constructor(
                         throw e
                     }
                 }
+            }
+
+            val downloadedSegments = segmentDir.listFiles { f -> f.extension == "ts" }?.size ?: 0
+            if (downloadedSegments < totalSegments) {
+                return@withContext Result.failure(
+                    Exception("Incomplete download: $downloadedSegments/$totalSegments segments")
+                )
             }
 
             mergeWorker.mergeSegments(
@@ -201,18 +224,26 @@ class HlsDownloader @Inject constructor(
         return bytes
     }
 
-    private fun decryptAes128InPlace(file: File, keyBytes: ByteArray, ivBytes: ByteArray) {
+    private fun decryptAes128(file: File, keyBytes: ByteArray, ivBytes: ByteArray) {
         val cipher = Cipher.getInstance("AES/CBC/PKCS5Padding")
         val keySpec = SecretKeySpec(keyBytes, "AES")
         val ivSpec = IvParameterSpec(ivBytes)
         cipher.init(Cipher.DECRYPT_MODE, keySpec, ivSpec)
 
-        val encrypted = file.readBytes()
-        val decrypted = cipher.doFinal(encrypted)
-        FileOutputStream(file, false).use { fos ->
-            fos.write(decrypted)
-            fos.flush()
-            fos.fd.sync()
+        val tempFile = File(file.parent, "${file.name}.decrypted.tmp")
+        try {
+            val encrypted = file.readBytes()
+            val decrypted = cipher.doFinal(encrypted)
+            FileOutputStream(tempFile, false).use { fos ->
+                fos.write(decrypted)
+                fos.flush()
+                fos.fd.sync()
+            }
+            if (!tempFile.renameTo(file)) {
+                throw IOException("Failed to rename decrypted file")
+            }
+        } finally {
+            if (tempFile.exists()) tempFile.delete()
         }
     }
 }

@@ -33,13 +33,18 @@ internal object DownloadRequestUtils {
     fun validateResponseLooksLikeMedia(contentType: String) {
         if (contentType.isBlank() || contentType.equals("application/octet-stream", ignoreCase = true)) return
 
-        val isErrorPage = contentType.startsWith("text/html", ignoreCase = true) &&
-            !contentType.contains("mpegurl", ignoreCase = true)
-        val isJsonError = contentType.startsWith("application/json", ignoreCase = true)
+        val isHtml = contentType.startsWith("text/html", ignoreCase = true)
+        val isPlainText = contentType.startsWith("text/plain", ignoreCase = true)
+        val isJson = contentType.startsWith("application/json", ignoreCase = true)
+        val isXml = contentType.startsWith("application/xml", ignoreCase = true) ||
+                   contentType.startsWith("text/xml", ignoreCase = true)
 
-        if (isErrorPage || isJsonError) {
+        val isM3U8 = contentType.contains("mpegurl", ignoreCase = true) ||
+                    contentType.contains("apple.mpegurl", ignoreCase = true)
+
+        if ((isHtml || isPlainText || isJson || isXml) && !isM3U8) {
             throw IOException(
-                "Server returned $contentType instead of media — likely blocked by anti-hotlinking"
+                "Server returned $contentType instead of media — likely blocked by anti-hotlinking or expired URL"
             )
         }
     }

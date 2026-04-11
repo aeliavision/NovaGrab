@@ -40,34 +40,38 @@ class DownloadEngine @Inject constructor(
             }
         }
 
-        launch {
+        val monitorJob = launch {
             while (isActive) {
                 ensureNotPausedOrCancelled()
                 delay(500L)
             }
         }
 
-        val result: Result<Uri> = when (task.format) {
-            is VideoFormat.HLS -> {
-                hlsDownloader.download(task) {
-                    ensureNotPausedOrCancelled()
-                    trySend(it)
+        val result: Result<Uri> = try {
+            when (task.format) {
+                is VideoFormat.HLS -> {
+                    hlsDownloader.download(task) { progress ->
+                        ensureNotPausedOrCancelled()
+                        trySend(progress)
+                    }
                 }
-            }
 
-            is VideoFormat.DASH -> {
-                dashDownloader.download(task) {
-                    ensureNotPausedOrCancelled()
-                    trySend(it)
+                is VideoFormat.DASH -> {
+                    dashDownloader.download(task) { progress ->
+                        ensureNotPausedOrCancelled()
+                        trySend(progress)
+                    }
                 }
-            }
 
-            else -> {
-                httpRangeDownloader.download(task) {
-                    ensureNotPausedOrCancelled()
-                    trySend(it)
+                else -> {
+                    httpRangeDownloader.download(task) { progress ->
+                        ensureNotPausedOrCancelled()
+                        trySend(progress)
+                    }
                 }
             }
+        } finally {
+            monitorJob.cancel()
         }
 
         val latest = downloadRepository.getById(taskId)
@@ -93,7 +97,7 @@ class DownloadEngine @Inject constructor(
                 taskId,
                 DownloadStatus.Failed(result.exceptionOrNull()?.message ?: "Unknown error"),
             )
-            storageManager.deleteTempDirForTask(taskId)
+            // DO NOT delete temp dir on failure to allow resumption on next attempt
         }
     }
 }
