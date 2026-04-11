@@ -2,8 +2,8 @@ package com.aeliavision.novagrab.feature.downloader.engine
 
 import android.net.Uri
 import com.aeliavision.novagrab.core.storage.StorageManager
-import com.antonkarpenko.ffmpegkit.FFmpegKit
-import com.antonkarpenko.ffmpegkit.ReturnCode
+import com.arthenica.ffmpegkit.FFmpegKit
+import com.arthenica.ffmpegkit.ReturnCode
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
@@ -32,6 +32,7 @@ class HlsMergeWorker @Inject constructor(
         )
 
         val outputFile = File(segmentDir, "$outputFileName.mp4")
+        if (outputFile.exists()) outputFile.delete()
 
         val inputArgsFast = if (isDash) {
             val joined = segments.joinToString("|") { it.absolutePath }
@@ -53,13 +54,13 @@ class HlsMergeWorker @Inject constructor(
             "\"${outputFile.absolutePath}\""
 
         val session = FFmpegKit.execute(commandFast)
-        val finalSession = if (ReturnCode.isSuccess(session.returnCode)) {
+        val finalSession = if (ReturnCode.isSuccess(session.getReturnCode())) {
             session
         } else {
             FFmpegKit.execute(commandRemux)
         }
 
-        return@withContext if (ReturnCode.isSuccess(finalSession.returnCode)) {
+        return@withContext if (ReturnCode.isSuccess(finalSession.getReturnCode())) {
             val uri = storageManager.mergeChunksToMediaStore(
                 chunkFiles = listOf(outputFile),
                 fileName = "$outputFileName.mp4",
@@ -67,7 +68,7 @@ class HlsMergeWorker @Inject constructor(
             )
             Result.success(uri)
         } else {
-            Result.failure(Exception("FFmpeg failed: ${finalSession.output}"))
+            Result.failure(Exception("FFmpeg failed: ${finalSession.getAllLogsAsString()}"))
         }
     }
 }

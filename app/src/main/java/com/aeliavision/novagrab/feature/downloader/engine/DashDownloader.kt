@@ -43,9 +43,9 @@ class DashDownloader @Inject constructor(
             val manifest = manifestParser.parse(task.url).getOrElse { return@withContext Result.failure(it) }
             val effectiveHeaders = buildEffectiveHeaders(task)
             val taskWithHeaders = task.copy(headers = effectiveHeaders)
-            
+
             // Choose the best representation for now
-            val representation = manifest.variants.maxByOrNull { it.bandwidth } 
+            val representation = manifest.variants.maxByOrNull { it.bandwidth }
                 ?: return@withContext Result.failure(Exception("No representations found in MPD"))
 
             val tempDir = storageManager.getTempDirForTask(task.id)
@@ -58,6 +58,21 @@ class DashDownloader @Inject constructor(
             representation.segments.forEachIndexed { index, seg ->
                 currentCoroutineContext().ensureActive()
                 val segFile = File(segmentDir, "seg_${index}.m4s") // DASH segments are usually m4s
+
+                if (segFile.exists() && segFile.length() > 0) {
+                    downloadedBytesTotal += segFile.length()
+                    val speed = speedometer.update(downloadedBytesTotal)
+                    onProgress(
+                        DownloadProgress(
+                            taskId = taskWithHeaders.id,
+                            downloadedBytes = downloadedBytesTotal,
+                            totalBytes = -1L,
+                            percentage = (index * 100 / totalSegments).coerceIn(0, 100),
+                            speedBytesPerSec = speed,
+                        )
+                    )
+                    return@forEachIndexed
+                }
 
                 retryPolicy.withRetry {
                     val priorTotal = downloadedBytesTotal
@@ -83,6 +98,13 @@ class DashDownloader @Inject constructor(
                 }
             }
 
+            val downloadedSegments = segmentDir.listFiles { f -> f.extension == "m4s" }?.size ?: 0
+            if (downloadedSegments < totalSegments) {
+                return@withContext Result.failure(
+                    Exception("Incomplete download: $downloadedSegments/$totalSegments segments")
+                )
+            }
+
             mergeWorker.mergeSegments(
                 taskId = taskWithHeaders.id,
                 segmentDir = segmentDir,
@@ -95,8 +117,8 @@ class DashDownloader @Inject constructor(
     }
 
     private suspend fun downloadSegment(
-        url: String, 
-        headers: Map<String, String>, 
+        url: String,
+        headers: Map<String, String>,
         outFile: File,
         onProgress: suspend (Long) -> Unit
     ): Long {
