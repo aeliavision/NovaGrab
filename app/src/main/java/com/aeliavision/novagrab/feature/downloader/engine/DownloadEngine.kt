@@ -98,6 +98,7 @@ class DownloadEngine @Inject constructor(
                 DownloadStatus.Failed(result.exceptionOrNull()?.message ?: "Unknown error"),
             )
             // DO NOT delete temp dir on failure to allow resumption on next attempt
+            throw result.exceptionOrNull() ?: Exception("Unknown error")
         }
     }
 }

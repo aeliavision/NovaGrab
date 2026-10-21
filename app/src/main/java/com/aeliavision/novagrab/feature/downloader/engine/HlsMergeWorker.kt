@@ -2,8 +2,8 @@ package com.aeliavision.novagrab.feature.downloader.engine
 
 import android.net.Uri
 import com.aeliavision.novagrab.core.storage.StorageManager
-import com.arthenica.ffmpegkit.FFmpegKit
-import com.arthenica.ffmpegkit.ReturnCode
+import com.antonkarpenko.ffmpegkit.FFmpegKit
+import com.antonkarpenko.ffmpegkit.ReturnCode
 import java.io.File
 import javax.inject.Inject
 import kotlinx.coroutines.Dispatchers
